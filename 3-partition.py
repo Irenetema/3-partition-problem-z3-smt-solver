@@ -1,4 +1,56 @@
+import random
+import time
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 from z3 import *
+
+
+def generate_test_set(values_range=None, size_of_set=21, is_sat=True):
+    if values_range is None:
+        values_range = [0, 100]
+
+    if size_of_set % 3 != 0:
+        raise ValueError('The size of the set should be divisible by 3!')
+
+    final_set = []
+    if is_sat:
+        range_length = values_range[1] + values_range[0]
+        target_nbr = random.randint(int(range_length / 2), values_range[1])
+
+        while len(final_set) < size_of_set:
+            subset = []
+            subset_elt1 = random.randint(values_range[0], int(range_length/3))
+            subset.append(subset_elt1)
+
+            upper_bound = target_nbr - subset_elt1
+            subset_elt2 = random.randint(values_range[0], upper_bound - 2)
+            while subset_elt1 + subset_elt2 >= target_nbr:
+                print(f'In while loop: Elt1: {subset_elt1};   Elt2: {subset_elt2};   Target: {target_nbr}')
+                # subset_elt2 = random.randint(values_range[0], target_nbr - 2)
+                subset_elt2 = random.randint(values_range[0], upper_bound - 2)
+            subset.append(subset_elt2)
+
+            subset_elt3 = target_nbr - (subset_elt1 + subset_elt2)
+            if subset_elt3 <= 0:
+                raise ValueError('The elements of the subset don\'t add to the target value!')
+            subset.append(subset_elt3)
+
+            final_set = final_set + subset
+    else:
+        while len(final_set) < size_of_set:
+            subset = []
+            subset_elt1 = random.randint(values_range[0], values_range[1])
+            subset.append(subset_elt1)
+
+            subset_elt2 = random.randint(values_range[0], values_range[1])
+            subset.append(subset_elt2)
+
+            subset_elt3 = random.randint(values_range[0], values_range[1])
+            subset.append(subset_elt3)
+
+            final_set = final_set + subset
+    return final_set
 
 
 class ThreePartition:
@@ -55,18 +107,50 @@ class ThreePartition:
 
 
 if __name__ == '__main__':
-    # S = [7, 3, 2, 1, 5, 4, 8, 9, 9]
-    # S = [20, 23, 25, 30, 49, 45, 27, 30, 30, 40, 22, 19]
-    # S = [0, 0, 1, 1, 1, 2, 2, 2, 4, 4, 4, 5, 5, 5, 8, 8, 10, 10]
-    # S = [0, 0, 1, 1, 1, 2, 3, 3, 4, 4, 4, 4, 4, 6, 6, 9, 10, 10]
-    # S = [0, 0, 1, 1, 2, 2, 2, 2, 4, 4, 4, 5, 5, 5, 8, 8, 9, 10]
-    S = [0, 1, 2, 5, 5, 5, 6, 6, 6, 6, 6, 8, 8, 8, 8, 9, 9, 10, 0, 0, 2, 5, 5, 5, 6, 6, 6, 6, 6, 8, 8, 8, 9, 9, 9, 10]
+    ## S = [7, 3, 2, 1, 5, 4, 8, 9, 9]
+    ## S = [20, 23, 25, 30, 49, 45, 27, 30, 30, 40, 22, 19]
+    all_runtime = []
 
-    solver = ThreePartition(S)
-    status = solver.solve()
-    if status.check() == sat:
-        solution = solver.get_solution()
-        print('3 partition solution:', solution)
-    else:
-        print('Instance of 3 partition has NO SOLUTION! => ', status.check())
+    # set_sizes = [6, 12, 24, 36, 48, 51]
+    set_sizes = [6, 12, 24, 27, 30, 36, 42, 51, 60, 69]
+    values_ranges = [[1000, 5000], [100000, 500000], [100000000, 500000000], [10000000000, 50000000000]]
 
+    for v_range in tqdm(values_ranges):
+        all_runtime = []
+        for s in tqdm(set_sizes):
+            S = generate_test_set(
+                values_range=v_range,
+                size_of_set=s,
+                is_sat=True  # defines if the set generated should be a satisfiable instance
+            )
+            # print('-----> Set generated: ', S)
+            print('-----> Size of set generated: ', len(S))
+
+            time_start = time.time()
+            solver = ThreePartition(S)
+            status = solver.solve()
+            if status.check() == sat:
+                solution = solver.get_solution()
+                print('3 partition solution:', solution)
+            else:
+                print('Instance of 3 partition has NO SOLUTION! => ', status.check())
+            time_end = time.time()
+            runtime = time_end - time_start
+            all_runtime.append(runtime)
+            print('Size {} --> solved in {:.2f}s'.format(s, time_end - time_start))
+
+        plt.plot(set_sizes, all_runtime, '.-', label=f'values: {v_range}')
+    plt.xlabel('Size of input set (S)')
+    plt.ylabel('Running time (second)')
+    plt.title('Performance on satisfiable instances')
+    plt.legend()
+    plt.show()
+
+    # print(solver.solution)
+    # print(solver.check())
+    # print(solver.solution.model())
+    #
+    # # m = solver.solution.model()
+    # # print(solver.solution.statistics())
+    # # if is_true(m.eval(Bool('X_0_2'))):
+    # #     print('Yes it is true!')
